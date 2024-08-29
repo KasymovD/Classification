@@ -1,104 +1,163 @@
-import numpy as np
-from tensorflow.keras.applications import ResNet50
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
-from tensorflow.keras.utils import to_categorical
+import tensorflow as tf
+from tensorflow.keras import layers, models
 from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+import numpy as np
+import joblib
 import os
 from PIL import Image
-import tensorflow as tf
-import joblib
+from sklearn.model_selection import train_test_split
 
-def load_images(folder, img_size=(128, 128)):
+def identity_block(X, f, filters, stage, block):
+    conv_name_base = 'res' + str(stage) + block + '_branch'
+    bn_name_base = 'bn' + str(stage) + block + '_branch'
+
+    F1, F2, F3 = filters
+
+    X_shortcut = X
+
+    X = layers.Conv2D(F1, (1, 1), strides=(1, 1), name=conv_name_base + '2a')(X)
+    X = layers.BatchNormalization(name=bn_name_base + '2a')(X)
+    X = layers.Activation('relu')(X)
+
+    X = layers.Conv2D(F2, (f, f), strides=(1, 1), padding='same', name=conv_name_base + '2b')(X)
+    X = layers.BatchNormalization(name=bn_name_base + '2b')(X)
+    X = layers.Activation('relu')(X)
+
+    X = layers.Conv2D(F3, (1, 1), strides=(1, 1), name=conv_name_base + '2c')(X)
+    X = layers.BatchNormalization(name=bn_name_base + '2c')(X)
+
+    X = layers.add([X, X_shortcut])
+    X = layers.Activation('relu')(X)
+
+    return X
+
+def convolutional_block(X, f, filters, stage, block, s=2):
+    conv_name_base = 'res' + str(stage) + block + '_branch'
+    bn_name_base = 'bn' + str(stage) + block + '_branch'
+
+    F1, F2, F3 = filters
+
+    X_shortcut = X
+
+    X = layers.Conv2D(F1, (1, 1), strides=(s, s), name=conv_name_base + '2a')(X)
+    X = layers.BatchNormalization(name=bn_name_base + '2a')(X)
+    X = layers.Activation('relu')(X)
+
+    X = layers.Conv2D(F2, (f, f), strides=(1, 1), padding='same', name=conv_name_base + '2b')(X)
+    X = layers.BatchNormalization(name=bn_name_base + '2b')(X)
+    X = layers.Activation('relu')(X)
+
+    X = layers.Conv2D(F3, (1, 1), strides=(1, 1), name=conv_name_base + '2c')(X)
+    X = layers.BatchNormalization(name=bn_name_base + '2c')(X)
+
+    X_shortcut = layers.Conv2D(F3, (1, 1), strides=(s, s), name=conv_name_base + '1')(X_shortcut)
+    X_shortcut = layers.BatchNormalization(name=bn_name_base + '1')(X_shortcut)
+
+    X = layers.add([X, X_shortcut])
+    X = layers.Activation('relu')(X)
+
+    return X
+
+def ResNet50(input_shape=(64, 64, 3), classes=6):
+    X_input = layers.Input(input_shape)
+
+    X = layers.ZeroPadding2D((3, 3))(X_input)
+
+    X = layers.Conv2D(64, (7, 7), strides=(2, 2), name='conv1')(X)
+    X = layers.BatchNormalization(name='bn_conv1')(X)
+    X = layers.Activation('relu')(X)
+    X = layers.MaxPooling2D((3, 3), strides=(2, 2))(X)
+
+    X = convolutional_block(X, f=3, filters=[64, 64, 256], stage=2, block='a', s=1)
+    X = identity_block(X, 3, [64, 64, 256], stage=2, block='b')
+    X = identity_block(X, 3, [64, 64, 256], stage=2, block='c')
+
+    X = convolutional_block(X, f=3, filters=[128, 128, 512], stage=3, block='a', s=2)
+    X = identity_block(X, 3, [128, 128, 512], stage=3, block='b')
+    X = identity_block(X, 3, [128, 128, 512], stage=3, block='c')
+    X = identity_block(X, 3, [128, 128, 512], stage=3, block='d')
+
+    X = convolutional_block(X, f=3, filters=[256, 256, 1024], stage=4, block='a', s=2)
+    X = identity_block(X, 3, [256, 256, 1024], stage=4, block='b')
+    X = identity_block(X, 3, [256, 256, 1024], stage=4, block='c')
+    X = identity_block(X, 3, [256, 256, 1024], stage=4, block='d')
+    X = identity_block(X, 3, [256, 256, 1024], stage=4, block='e')
+    X = identity_block(X, 3, [256, 256, 1024], stage=4, block='f')
+
+    X = convolutional_block(X, f=3, filters=[512, 512, 2048], stage=5, block='a', s=2)
+    X = identity_block(X, 3, [512, 512, 2048], stage=5, block='b')
+    X = identity_block(X, 3, [512, 512, 2048], stage=5, block='c')
+
+    X = layers.AveragePooling2D(pool_size=(2, 2), padding='same')(X)
+
+    X = layers.Flatten()(X)
+    X = layers.Dense(classes, activation='softmax', name='fc' + str(classes))(X)
+
+    model = models.Model(inputs=X_input, outputs=X, name='ResNet50')
+
+    return model
+
+# Загрузка данных из `Processed_Dataset/公司` и `Processed_Dataset/關防-整理好的`
+def load_images_from_directory(directory, img_size=(64, 64)):
     images = []
     labels = []
 
-    for root, dirs, files in os.walk(folder):
-        for filename in files:
-            if filename.endswith(('.png', '.jpg', '.jpeg')):
-                img_path = os.path.join(root, filename)
+    for root, dirs, files in os.walk(directory):
+        class_name = os.path.basename(root)
+        for file_name in files:
+            img_path = os.path.join(root, file_name)
+            if os.path.isfile(img_path):
                 try:
-                    pil_image = Image.open(img_path).convert('L')
-                    pil_image = pil_image.resize(img_size)
-                    img = np.array(pil_image)
+                    img = Image.open(img_path).resize(img_size)
+                    img = np.array(img)
+                    if len(img.shape) == 2:
+                        img = np.stack([img] * 3, axis=-1)
                     images.append(img)
-
-                    label = os.path.basename(root)
-                    labels.append(label)
+                    labels.append(class_name)
                 except Exception as e:
-                    print(f"Warning: Could not open or process the image {img_path}. Error: {e}")
+                    print(f"Warning: Could not process image {img_path}. Error: {e}")
 
     images = np.array(images)
-    images = np.repeat(images[..., np.newaxis], 3, axis=-1)  # Повторяем канал для RGB
-    return images, np.array(labels)
+    labels = np.array(labels)
+    print(f"Loaded {len(images)} images from {directory}")
+    return images, labels
 
-print("Starting data loading...")
-processed_data_folder_1 = r'Processed_Dataset/公司'
-processed_data_folder_2 = r'Processed_Dataset/關防-整理好的'
+# Загрузка данных
+images_1, labels_1 = load_images_from_directory('Processed_Dataset/公司')
+images_2, labels_2 = load_images_from_directory('Processed_Dataset/關防-整理好的')
 
-images_1, labels_1 = load_images(processed_data_folder_1)
-print(f"Loaded {len(images_1)} images from {processed_data_folder_1}")
+# Проверка форм массивов
+print(f"Shape of images_1: {images_1.shape}")
+print(f"Shape of images_2: {images_2.shape}")
 
-images_2, labels_2 = load_images(processed_data_folder_2)
-print(f"Loaded {len(images_2)} images from {processed_data_folder_2}")
+if images_1.ndim == images_2.ndim and len(images_2) > 0:
+    images = np.concatenate([images_1, images_2], axis=0)
+    labels = np.concatenate([labels_1, labels_2], axis=0)
+else:
+    raise ValueError("Dimension mismatch between datasets")
 
-images = np.concatenate([images_1, images_2], axis=0)
-labels = np.concatenate([labels_1, labels_2], axis=0)
-print(f"Total images loaded: {len(images)}")
+# Нормализация изображений
+images = images / 255.0
 
+# Преобразование меток в числовые значения и сохранение classes.pkl
 label_encoder = LabelEncoder()
 labels_encoded = label_encoder.fit_transform(labels)
-labels_encoded = to_categorical(labels_encoded)
-print("Labels encoding complete.")
+labels_encoded = tf.keras.utils.to_categorical(labels_encoded)
 
+# Сохранение классов в файл classes.pkl
 joblib.dump(label_encoder.classes_, 'classes.pkl')
-print("Class labels saved to 'classes.pkl'.")
 
+# Разделение данных на обучающую и тестовую выборки
 X_train, X_test, y_train, y_test = train_test_split(images, labels_encoded, test_size=0.2, random_state=42)
-print("Data split into training and test sets.")
 
-print("Loading ResNet50 model...")
-base_model = ResNet50(weights='imagenet', include_top=False, input_shape=(128, 128, 3))
-print("ResNet50 model loaded.")
+# Создание модели ResNet50
+model = ResNet50(input_shape=(64, 64, 3), classes=len(label_encoder.classes_))
 
-x = base_model.output
-x = GlobalAveragePooling2D()(x)
-x = Dropout(0.4)(x)
-x = Dense(1024, activation='relu')(x)
-x = Dropout(0.4)(x)
-predictions = Dense(len(label_encoder.classes_), activation='softmax')(x)
+# Компиляция модели
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-model = Model(inputs=base_model.input, outputs=predictions)
-print("Model architecture created.")
+# Обучение модели
+model.fit(X_train, y_train, epochs=16, validation_data=(X_test, y_test))
 
-for layer in base_model.layers[:-10]:
-    layer.trainable = False
-print("Base model layers frozen, except the last 10 layers.")
-
-model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001), loss='categorical_crossentropy', metrics=['accuracy'])
-print("Model compiled.")
-
-early_stopping = EarlyStopping(
-    monitor='val_loss',
-    min_delta=0.001,
-    patience=5,
-    verbose=1,
-    restore_best_weights=True,
-    mode='min'
-)
-reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=3, min_lr=0.00001, verbose=1)
-
-print("Starting model training...")
-model.fit(
-    X_train, y_train,
-    epochs=7,
-    validation_data=(X_test, y_test),
-    callbacks=[early_stopping, reduce_lr],
-    verbose=1
-)
-print("Model training complete.")
-
-model.save('stamp_classification_model_resnet50.h5')
-print("Model saved as 'stamp_classification_model_resnet50.h5'.")
+# Сохранение модели
+model.save("resnet50_custom_model.h5")
