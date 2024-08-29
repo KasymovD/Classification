@@ -36,7 +36,6 @@ def load_images_from_directory(directory, img_size=(64, 64)):
 images_1, labels_1 = load_images_from_directory('Processed_Dataset/公司')
 images_2, labels_2 = load_images_from_directory('Processed_Dataset/關防-整理好的')
 
-# Проверка форм массивов
 print(f"Shape of images_1: {images_1.shape}")
 print(f"Shape of images_2: {images_2.shape}")
 
