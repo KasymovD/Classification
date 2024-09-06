@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>670</width>
+    <height>420</height>
+   </rect>
+  </property>
+  <property name="cursor">
+   <cursorShape>ArrowCursor</cursorShape>
+  </property>
+  <property name="windowTitle">
+   <string>關防圖章AI辨識</string>
+  </property>
+  <property name="autoFillBackground">
+   <bool>false</bool>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">   background-color: qlineargradient(spread:pad, x1:1, y1:1, x2:0, y2:0,
+    stop:0 rgba(81, 0, 135, 255),
+    stop:0.427447 rgba(41, 61, 132, 235),
+    stop:1 rgba(155, 79, 165, 255));
+font-family: Noto Sans SC;</string>
+  </property>
+  <property name="documentMode">
+   <bool>false</bool>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout_3">
+    <item>
+     <layout class="QVBoxLayout" name="verticalLayout_2">
+      <item>
+       <layout class="QVBoxLayout" name="verticalLayout">
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout">
+          <item>
+           <widget class="QLabel" name="input_image">
+            <property name="cursor">
+             <cursorShape>ArrowCursor</cursorShape>
+            </property>
+            <property name="layoutDirection">
+             <enum>Qt::LayoutDirection::LeftToRight</enum>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">background-color: rgba(255, 255, 255, 30);
+border:1px solid rgba(255, 255, 255, 40);
+border-radius: 7px;</string>
+            </property>
+            <property name="text">
+             <string>印章圖像</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="image2">
+            <property name="mouseTracking">
+             <bool>false</bool>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">background-color: rgba(255, 255, 255, 30);
+border:1px solid rgba(255, 255, 255, 40);
+border-radius: 7px;</string>
+            </property>
+            <property name="text">
+             <string>模型印章</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignCenter</set>
+            </property>
+            <property name="wordWrap">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_2">
+        <item>
+         <widget class="QPushButton" name="Model_choose_button">
+          <property name="text">
+           <string>選擇模型</string>
+          </property>
+          <property name="icon">
+           <iconset>
+            <normaloff>icons/smart_toy_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</normaloff>icons/smart_toy_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</iconset>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="Crop_button">
+          <property name="text">
+           <string>準備印章</string>
+          </property>
+          <property name="icon">
+           <iconset>
+            <normaloff>icons/crop_rotate_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</normaloff>icons/crop_rotate_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</iconset>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="Generator_button">
+          <property name="text">
+           <string>生成機</string>
+          </property>
+          <property name="icon">
+           <iconset>
+            <normaloff>icons/token_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</normaloff>icons/token_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</iconset>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="Learn_button">
+          <property name="text">
+           <string>教育 </string>
+          </property>
+          <property name="icon">
+           <iconset>
+            <normaloff>icons/autorenew_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</normaloff>icons/autorenew_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</iconset>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_3">
+        <item>
+         <widget class="QPushButton" name="Start_button">
+          <property name="text">
+           <string>開始</string>
+          </property>
+          <property name="icon">
+           <iconset>
+            <normaloff>icons/task_alt_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</normaloff>icons/task_alt_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</iconset>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="Test_button">
+          <property name="text">
+           <string>測試模型</string>
+          </property>
+          <property name="icon">
+           <iconset>
+            <normaloff>icons/empty_dashboard_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</normaloff>icons/empty_dashboard_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</iconset>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="Save_button">
+          <property name="text">
+           <string>保存</string>
+          </property>
+          <property name="icon">
+           <iconset>
+            <normaloff>icons/save_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</normaloff>icons/save_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</iconset>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="Clear_button">
+          <property name="text">
+           <string>清除</string>
+          </property>
+          <property name="icon">
+           <iconset>
+            <normaloff>icons/delete_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</normaloff>icons/delete_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</iconset>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QProgressBar" name="progressBar">
+        <property name="value">
+         <number>0</number>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="analyz">
+        <property name="styleSheet">
+         <string notr="true">background-color: rgba(255, 255, 255, 30);
+border:1px solid rgba(255, 255, 255, 40);
+border-radius: 7px;</string>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignmentFlag::AlignCenter</set>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
