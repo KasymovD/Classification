@@ -16,6 +16,10 @@
   <property name="windowTitle">
    <string>關防圖章AI辨識</string>
   </property>
+  <property name="windowIcon">
+   <iconset>
+    <normaloff>icons/Republic_of_China_Police_Logo.svg.png</normaloff>icons/Republic_of_China_Police_Logo.svg.png</iconset>
+  </property>
   <property name="autoFillBackground">
    <bool>false</bool>
   </property>

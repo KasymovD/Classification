@@ -19,6 +19,8 @@ from tensorflow.keras.optimizers import Adam  # Импортируем Adam
 import joblib
 import numpy as np
 import datetime  # Для добавления даты и времени к имени файлов
+import random
+import glob
 
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -29,7 +31,6 @@ model = load_model('stamp_classification_model_resnet50.h5')
 classes = joblib.load('classes.pkl')
 label_encoder = LabelEncoder()
 label_encoder.fit(classes)
-
 
 def load_images(folder, img_size=(128, 128)):
     images = []
@@ -149,7 +150,7 @@ class TrainingThread(QThread):
 
             # Начало обучения
             self.update_status.emit("Начало обучения модели...")
-            epochs = 60
+            epochs = 1
             for epoch in range(1, epochs + 1):
                 model.fit(X_train, y_train, epochs=1, validation_data=(X_test, y_test), verbose=1)
                 progress = int((epoch / epochs) * 100)  # Обновляем прогресс-бара
@@ -169,7 +170,7 @@ class TrainingThread(QThread):
 #
 #     img = load_img(img_path, target_size=(128, 128), color_mode='grayscale')
 #     img_array = img_to_array(img)
-#     img_array = np.repeat(img_array, 3, axis=-1)  # Преобразование в 3 канала
+#     img_array = np.repeat(img_array, 3, axis=-1)
 #     img_array = np.expand_dims(img_array, axis=0)
 #     prediction = model.predict(img_array)
 #     predicted_class = np.argmax(prediction, axis=1)
@@ -178,28 +179,47 @@ class TrainingThread(QThread):
 
 class PredictionThread(QThread):
     prediction_done = pyqtSignal(str, np.ndarray, str)
+    update_progress = pyqtSignal(int)  # Добавляем сигнал для прогресса
 
-    def __init__(self, img_path):
+    def __init__(self, img_path, model, label_encoder):
         super().__init__()
         self.img_path = img_path
-
+        self.model = model
+        self.label_encoder = label_encoder
     def run(self):
-        predicted_label, img_array = predict_stamp(self.img_path)
+
+        # Обновляем прогресс на 50% при начале работы
+        self.update_progress.emit(50)
+
+        # Выполняем предсказание
+        predicted_label, img_array = predict_stamp(self.img_path, self.model, self.label_encoder)
+
+        # Обновляем прогресс на 100% по завершении
+        self.update_progress.emit(100)
+
+        # Передаём результат
+        self.prediction_done.emit(predicted_label, img_array, self.img_path)
+
+        predicted_label, img_array = predict_stamp(self.img_path, self.model, self.label_encoder)
         self.prediction_done.emit(predicted_label, img_array, self.img_path)
 
 
 
-def predict_stamp(img_path):
+def predict_stamp(img_path, model, label_encoder):
     if model is None or label_encoder is None:
         return "Модель или классы не загружены", None
 
+    # Загружаем изображение и преобразуем его
     img = load_img(img_path, target_size=(128, 128), color_mode='grayscale')
     img_array = img_to_array(img)
-    img_array = np.repeat(img_array, 3, axis=-1)  # Преобразование в 3 канала
+    img_array = np.repeat(img_array, 3, axis=-1)  # Преобразование в 3 канала (RGB)
     img_array = np.expand_dims(img_array, axis=0)
+
+    # Предсказание
     prediction = model.predict(img_array)
     predicted_class = np.argmax(prediction, axis=1)
     predicted_label = label_encoder.inverse_transform(predicted_class)
+
     return predicted_label[0], img_array
 
 class MainApp(QMainWindow):
@@ -216,12 +236,90 @@ class MainApp(QMainWindow):
         self.ui.Crop_button.clicked.connect(self.prepare_stamps)
         self.ui.Generator_button.clicked.connect(self.start_generation)
         self.ui.Learn_button.clicked.connect(self.start_training)
+        self.ui.Test_button.clicked.connect(self.start_testing)
 
         self.model_loaded = False
         self.classes_loaded = False
 
         self.ui.progressBar.setValue(0)
         self.ui.progressBar.setMaximum(100)
+
+    def start_testing(self):
+        try:
+            # 1. Выбор модели для тестирования
+            model_path, _ = QFileDialog.getOpenFileName(self, 'Выберите модель для тестирования', '', 'H5 files (*.h5)')
+            if not model_path:
+                self.ui.analyz.setText("Ошибка: модель не выбрана!")
+                return
+            self.ui.analyz.setText(f"Выбрана модель: {model_path}")
+
+            # Загрузка выбранной модели
+            model = load_model(model_path)
+
+            # 2. Выбор файла классов для тестирования
+            classes_path, _ = QFileDialog.getOpenFileName(self, 'Выберите файл классов', '', 'Pickle files (*.pkl)')
+            if not classes_path:
+                self.ui.analyz.setText("Ошибка: файл классов не выбран!")
+                return
+            self.ui.analyz.setText(f"Выбран файл классов: {classes_path}")
+
+            # Загрузка выбранных классов
+            label_encoder = LabelEncoder()
+            classes = joblib.load(classes_path)
+            label_encoder.fit(classes)
+
+            # Используем папки в Processed_Dataset для тестирования
+            base_folders = [r'Processed_Dataset/公司', r'Processed_Dataset/關防-整理好的']
+
+            # Собираем все классы (папки) в списке
+            all_classes = []
+            for folder in base_folders:
+                all_classes.extend([os.path.join(folder, subfolder) for subfolder in os.listdir(folder) if
+                                    os.path.isdir(os.path.join(folder, subfolder))])
+
+            if len(all_classes) < 5:
+                self.ui.analyz.setText("Ошибка: Недостаточно классов для тестирования!")
+                return
+
+            # Выбираем пять случайных классов для тестирования
+            random_classes = random.sample(all_classes, 5)
+
+            # Собираем 50 изображений из каждого класса
+            test_images = {}
+            for class_folder in random_classes:
+                image_paths = glob.glob(os.path.join(class_folder, '*.png')) + \
+                              glob.glob(os.path.join(class_folder, '*.jpg')) + \
+                              glob.glob(os.path.join(class_folder, '*.jpeg'))
+                if len(image_paths) > 50:
+                    image_paths = random.sample(image_paths, 50)  # Выбираем 50 случайных изображений
+                test_images[class_folder] = image_paths
+
+            # Проходим тестирование три раза для каждого класса
+            total_accuracy = 0
+            num_classes = len(test_images)
+
+            for class_folder, images in test_images.items():
+                correct_predictions = 0
+                for _ in range(3):  # Три раза
+                    for img_path in images:
+                        predicted_label, _ = predict_stamp(img_path, model,
+                                                           label_encoder)  # Используем функцию с новой моделью
+                        true_label = os.path.basename(class_folder)
+
+                        if predicted_label == true_label:
+                            correct_predictions += 1
+
+                # Рассчитываем точность для этого класса
+                accuracy = (correct_predictions / (3 * len(images))) * 100
+                total_accuracy += accuracy
+                self.ui.analyz.setText(f"Точность для {class_folder}: {accuracy:.2f}%")
+
+            # Рассчитываем общий средний процент точности
+            average_accuracy = total_accuracy / num_classes
+            self.ui.analyz.setText(f"Средняя точность по всем классам: {average_accuracy:.2f}%")
+
+        except Exception as e:
+            self.ui.analyz.setText(f"Ошибка: {str(e)}")
 
     def start_training(self):
         try:
@@ -237,14 +335,23 @@ class MainApp(QMainWindow):
                 self.ui.analyz.setText("Ошибка: файл классов не выбран!")
                 return
 
-            # 3. Выбор папки с изображениями
-            folder = QFileDialog.getExistingDirectory(self, 'Выберите папку с изображениями')
-            if not folder:
-                self.ui.analyz.setText("Папка не выбрана!")
+            # 3. Выбор нескольких папок с изображениями
+            folders = []
+            while True:
+                folder = QFileDialog.getExistingDirectory(self,
+                                                          'Выберите папку с изображениями (нажмите Отмена для завершения)')
+                if folder:
+                    folders.append(folder)
+                    self.ui.analyz.setText(f"Добавлена папка: {folder}")
+                else:
+                    break
+
+            if not folders:
+                self.ui.analyz.setText("Ошибка: ни одна папка не выбрана!")
                 return
 
             # Запуск обучения в отдельном потоке
-            self.training_thread = TrainingThread([folder], model_path, classes_path)
+            self.training_thread = TrainingThread(folders, model_path, classes_path)
             self.training_thread.update_progress.connect(self.update_progress_bar)
             self.training_thread.update_status.connect(self.ui.analyz.setText)
             self.training_thread.start()
@@ -412,8 +519,19 @@ class MainApp(QMainWindow):
         img_path, _ = file_dialog.getOpenFileName(self, 'Выбрать изображение', '', 'Images (*.png *.xpm *.jpg *.bmp)')
 
         if img_path:
-            self.prediction_thread = PredictionThread(img_path)
+            # Передаем загруженную модель и энкодер классов в поток предсказания
+            self.prediction_thread = PredictionThread(img_path, model, label_encoder)
+
+            # Подключаем обновление прогресса к прогресс-бару
+            self.prediction_thread.update_progress.connect(self.update_progress_bar)
+
+            # Подключаем завершение предсказания к обработчику результата
             self.prediction_thread.prediction_done.connect(self.on_prediction_done)
+
+            # Обнуляем прогресс-бар перед началом работы
+            self.ui.progressBar.setValue(0)
+
+            # Запускаем предсказание
             self.prediction_thread.start()
 
     def on_prediction_done(self, predicted_label, img_array, img_path):
@@ -447,10 +565,9 @@ class MainApp(QMainWindow):
         pixmap = QPixmap.fromImage(q_img)
         label.setPixmap(pixmap.scaled(label.size(), Qt.KeepAspectRatio))
 
-    # Функция для очистки всех QLabel
     def clear_labels(self):
-        self.ui.input_image.clear()
-        self.ui.image2.clear()
+        self.ui.input_image.setText("印章圖像")
+        self.ui.image2.setText("模型印章")
         self.ui.analyz.clear()
 
 
