@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>905</width>
+    <height>619</height>
+   </rect>
+  </property>
+  <property name="cursor">
+   <cursorShape>ArrowCursor</cursorShape>
+  </property>
+  <property name="windowTitle">
+   <string>關防圖章AI辨識</string>
+  </property>
+  <property name="windowIcon">
+   <iconset>
+    <normaloff>icons/Republic_of_China_Police_Logo.svg.png</normaloff>icons/Republic_of_China_Police_Logo.svg.png</iconset>
+  </property>
+  <property name="autoFillBackground">
+   <bool>false</bool>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">background-color: rgb(10, 15, 27);
+font-family: Noto Sans SC;
+color:white;</string>
+  </property>
+  <property name="documentMode">
+   <bool>false</bool>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout_10">
+    <item>
+     <layout class="QVBoxLayout" name="verticalLayout_9">
+      <item>
+       <layout class="QVBoxLayout" name="verticalLayout_7">
+        <item>
+         <widget class="QFrame" name="Cate">
+          <property name="styleSheet">
+           <string notr="true">background-color: rgb(32, 40, 57);
+border-radius: 7px;
+font-size:15pt;</string>
+          </property>
+          <layout class="QHBoxLayout" name="horizontalLayout">
+           <item>
+            <layout class="QVBoxLayout" name="verticalLayout_4" stretch="0,1">
+             <item>
+              <widget class="QLabel" name="label_2">
+               <property name="styleSheet">
+                <string notr="true">font-size:12pt;</string>
+               </property>
+               <property name="text">
+                <string>原始印章</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="input_image">
+               <property name="cursor">
+                <cursorShape>ArrowCursor</cursorShape>
+               </property>
+               <property name="layoutDirection">
+                <enum>Qt::LayoutDirection::LeftToRight</enum>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">background-color: rgba(255, 255, 255, 30);
+border:1px solid rgba(255, 255, 255, 40);
+border-radius: 7px;
+font-size:12pt;</string>
+               </property>
+               <property name="text">
+                <string>原始印章</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignmentFlag::AlignCenter</set>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QVBoxLayout" name="verticalLayout_5" stretch="0,1">
+             <item>
+              <widget class="QLabel" name="label_5">
+               <property name="styleSheet">
+                <string notr="true">font-size:12pt;</string>
+               </property>
+               <property name="text">
+                <string>原始印章的特徵</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="image2">
+               <property name="mouseTracking">
+                <bool>false</bool>
+               </property>
+               <property name="styleSheet">
+                <string notr="true">background-color: rgba(255, 255, 255, 30);
+border:1px solid rgba(255, 255, 255, 40);
+border-radius: 7px;
+font-size:12pt;</string>
+               </property>
+               <property name="text">
+                <string>原始印章的特徵</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignmentFlag::AlignCenter</set>
+               </property>
+               <property name="wordWrap">
+                <bool>false</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QFrame" name="Cato2">
+          <property name="styleSheet">
+           <string notr="true">background-color: rgb(32, 40, 57);
+border-radius: 7px;</string>
+          </property>
+          <layout class="QHBoxLayout" name="horizontalLayout_4">
+           <item>
+            <layout class="QVBoxLayout" name="verticalLayout_6" stretch="0,1">
+             <item>
+              <widget class="QLabel" name="label_3">
+               <property name="styleSheet">
+                <string notr="true">font-size:12pt;</string>
+               </property>
+               <property name="text">
+                <string>與原始印章最相似的照片</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="model_image">
+               <property name="styleSheet">
+                <string notr="true">background-color: rgba(255, 255, 255, 30);
+border:1px solid rgba(255, 255, 255, 40);
+border-radius: 7px;
+font-size:12pt;</string>
+               </property>
+               <property name="text">
+                <string>與原始印章最相似的照片</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignmentFlag::AlignCenter</set>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QVBoxLayout" name="verticalLayout" stretch="0,1">
+             <item>
+              <widget class="QLabel" name="label_4">
+               <property name="styleSheet">
+                <string notr="true">font-size:12pt;</string>
+               </property>
+               <property name="text">
+                <string>原始印章的特徵</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="label">
+               <property name="styleSheet">
+                <string notr="true">background-color: rgba(255, 255, 255, 30);
+border:1px solid rgba(255, 255, 255, 40);
+border-radius: 7px;
+font-size:12pt;</string>
+               </property>
+               <property name="text">
+                <string>原始印章的特徵</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignmentFlag::AlignCenter</set>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+          </layout>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QVBoxLayout" name="verticalLayout_8">
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_2">
+          <item>
+           <widget class="QPushButton" name="Model_choose_button">
+            <property name="styleSheet">
+             <string notr="true">background-color: rgb(239, 98, 15);
+font-size:10pt;
+color: white;</string>
+            </property>
+            <property name="text">
+             <string>選擇模型</string>
+            </property>
+            <property name="icon">
+             <iconset>
+              <normaloff>icons/smart_toy_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</normaloff>icons/smart_toy_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</iconset>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="Crop_button">
+            <property name="styleSheet">
+             <string notr="true">background-color: rgb(239, 98, 15);
+font-size:10pt;
+color: white;</string>
+            </property>
+            <property name="text">
+             <string>準備印章</string>
+            </property>
+            <property name="icon">
+             <iconset>
+              <normaloff>icons/crop_rotate_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</normaloff>icons/crop_rotate_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</iconset>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="Generator_button">
+            <property name="styleSheet">
+             <string notr="true">background-color: rgb(239, 98, 15);
+font-size:10pt;
+color: white;</string>
+            </property>
+            <property name="text">
+             <string>生成機</string>
+            </property>
+            <property name="icon">
+             <iconset>
+              <normaloff>icons/token_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</normaloff>icons/token_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</iconset>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="Learn_button">
+            <property name="styleSheet">
+             <string notr="true">background-color: rgb(239, 98, 15);
+font-size:10pt;
+color: white;</string>
+            </property>
+            <property name="text">
+             <string> 元數據</string>
+            </property>
+            <property name="icon">
+             <iconset>
+              <normaloff>icons/account_tree_24dp_E8EAED_FILL0_wght400_GRAD0_opsz24.svg</normaloff>icons/account_tree_24dp_E8EAED_FILL0_wght400_GRAD0_opsz24.svg</iconset>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_3">
+          <item>
+           <widget class="QPushButton" name="Start_button">
+            <property name="styleSheet">
+             <string notr="true">background-color: rgb(239, 98, 15);
+font-size:10pt;
+color: white;</string>
+            </property>
+            <property name="text">
+             <string>開始</string>
+            </property>
+            <property name="icon">
+             <iconset>
+              <normaloff>icons/task_alt_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</normaloff>icons/task_alt_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</iconset>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="Test_button">
+            <property name="styleSheet">
+             <string notr="true">background-color: rgb(239, 98, 15);
+font-size:10pt;
+color: white;</string>
+            </property>
+            <property name="text">
+             <string>模型的特性</string>
+            </property>
+            <property name="icon">
+             <iconset>
+              <normaloff>icons/empty_dashboard_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</normaloff>icons/empty_dashboard_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</iconset>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="Save_button">
+            <property name="styleSheet">
+             <string notr="true">background-color: rgb(239, 98, 15);
+font-size:10pt;
+color: white;</string>
+            </property>
+            <property name="text">
+             <string>類別</string>
+            </property>
+            <property name="icon">
+             <iconset>
+              <normaloff>icons/book_4_24dp_E8EAED_FILL0_wght400_GRAD0_opsz24.svg</normaloff>icons/book_4_24dp_E8EAED_FILL0_wght400_GRAD0_opsz24.svg</iconset>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="Clear_button">
+            <property name="styleSheet">
+             <string notr="true">background-color: rgb(239, 98, 15);
+font-size:10pt;
+color: white;</string>
+            </property>
+            <property name="text">
+             <string>清除</string>
+            </property>
+            <property name="icon">
+             <iconset>
+              <normaloff>icons/delete_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</normaloff>icons/delete_42dp_E8EAED_FILL0_wght400_GRAD0_opsz40.svg</iconset>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QVBoxLayout" name="verticalLayout_3" stretch="0,1">
+          <item>
+           <widget class="QProgressBar" name="progressBar">
+            <property name="styleSheet">
+             <string notr="true">color: white;</string>
+            </property>
+            <property name="value">
+             <number>0</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_5">
+            <item>
+             <layout class="QVBoxLayout" name="verticalLayout_2">
+              <item>
+               <widget class="QLabel" name="analyz">
+                <property name="styleSheet">
+                 <string notr="true">background-color: rgba(255, 255, 255, 30);
+border:1px solid rgba(255, 255, 255, 40);
+border-radius: 7px;
+font-size:15pt;</string>
+                </property>
+                <property name="text">
+                 <string>印章類別</string>
+                </property>
+                <property name="alignment">
+                 <set>Qt::AlignmentFlag::AlignCenter</set>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="analyz_2">
+                <property name="styleSheet">
+                 <string notr="true">background-color: rgba(255, 255, 255, 30);
+border:1px solid rgba(255, 255, 255, 40);
+border-radius: 7px;
+font-size:15pt;</string>
+                </property>
+                <property name="text">
+                 <string>相似度百分比</string>
+                </property>
+                <property name="alignment">
+                 <set>Qt::AlignmentFlag::AlignCenter</set>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QLabel" name="analyz_3">
+              <property name="styleSheet">
+               <string notr="true">background-color: rgba(255, 255, 255, 30);
+border:1px solid rgba(255, 255, 255, 40);
+border-radius: 7px;
+font-size:15pt;</string>
+              </property>
+              <property name="text">
+               <string>分析結論</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignmentFlag::AlignCenter</set>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
