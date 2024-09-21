@@ -3,7 +3,7 @@
 import sys
 import os
 
-def resource_path(relative_path):
+def resource_path_1(relative_path):
     """Получает абсолютный путь к ресурсному файлу, работает как в режиме разработки, так и в собранном приложении"""
     try:
         # PyInstaller создает временную папку и сохраняет путь в _MEIPASS

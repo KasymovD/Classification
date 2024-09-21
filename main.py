@@ -1,3 +1,4 @@
+import logging
 import pickle
 import numpy as np
 from PyQt5.QtWidgets import QFileDialog, QMessageBox, QApplication, QMainWindow
@@ -12,8 +13,18 @@ from PIL import Image, ImageEnhance
 from hachoir.parser import createParser
 from hachoir.metadata import extractMetadata
 import sys
-from utils import resource_path  # Импортируем из utils.py
+from utils import resource_path_1  # Импортируем из utils.py
 
+logging.basicConfig(filename='app.log', level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(message)s')
+
+def resource_path(relative_path):
+    """Получает абсолютный путь к ресурсу, работает для dev и для PyInstaller"""
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -235,29 +246,37 @@ class MainWindow(QtWidgets.QMainWindow):
         image_path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, "選擇圖像", "", "Images (*.png *.jpg *.jpeg);;All Files (*)", options=options)
         if image_path:
-            self.input_image_path = image_path
+            # Обновляем прогресс-бар до 0%
             self.ui.progressBar.setValue(0)
-            QtWidgets.QApplication.processEvents()
 
+            # Отображаем оригинальное изображение
             pixmap = QtGui.QPixmap(image_path)
-            self.ui.input_image.setPixmap(
-                pixmap.scaled(self.ui.input_image.size(), QtCore.Qt.KeepAspectRatio))
+            self.ui.input_image.setPixmap(pixmap.scaled(self.ui.input_image.size(), QtCore.Qt.KeepAspectRatio))
             self.ui.input_image.setAlignment(QtCore.Qt.AlignCenter)
 
+            # Обновляем прогресс-бар до 50%
             self.ui.progressBar.setValue(50)
             QtWidgets.QApplication.processEvents()
 
-            self.process_image(image_path)
+            # Используем resource_path для путей
+            model_path = resource_path(self.model_path)
+            label_encoder_path = resource_path(self.label_encoder_path)
 
+            # Выполняем предсказание и отображаем результаты
+            self.process_image(image_path, model_path, label_encoder_path)
+
+            # Обновляем прогресс-бар до 100%
             self.ui.progressBar.setValue(100)
 
-    def process_image(self, image_path):
+    def process_image(self, image_path, model_path, label_encoder_path):
         try:
+            logging.debug("Начинается обработка изображения")
             results = our_model.full_predict(
                 image_path,
-                self.model_path,
-                self.label_encoder_path
+                model_path,
+                label_encoder_path
             )
+            logging.debug("Обработка изображения завершена успешно")
 
             main_category = results['main_category']
             sub_categories = results['sub_categories']
@@ -310,8 +329,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.ui.label.clear()
                 self.ui.label.setText("原始印章的特徵")
 
+
         except Exception as e:
+
+            logging.exception("Произошло исключение в process_image")
+
             QtWidgets.QMessageBox.critical(
+
                 self, "錯誤", f"處理圖像時發生錯誤:\n{e}")
 
     def clear_labels(self):

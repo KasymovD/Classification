@@ -1,14 +1,40 @@
+import logging
+import os
+import sys
+
 import numpy as np
-from PIL import Image, ImageFilter, ImageOps
+from PIL import Image, ImageFilter
 from tensorflow.keras.models import load_model, Model
 import joblib
-import os
 from PyQt5.QtGui import QImage
 import io
 
+logging.basicConfig(level=logging.DEBUG)
+
+def resource_path(relative_path):
+    """Получает абсолютный путь к ресурсу, работает для dev и для PyInstaller"""
+    try:
+        # PyInstaller создает временную папку и сохраняет путь в _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
 def full_predict(image_path, model_path, label_encoder_path):
-    model = load_model(model_path, compile=False)
-    label_encoder = joblib.load(label_encoder_path)
+    logging.debug("Начало предсказания")
+
+    # Используем resource_path для моделей
+    model_path = resource_path(model_path)
+    label_encoder_path = resource_path(label_encoder_path)
+
+    # Загружаем модель и label_encoder
+    try:
+        model = load_model(model_path, compile=False)
+        label_encoder = joblib.load(label_encoder_path)
+    except Exception as e:
+        logging.exception(f"Ошибка при загрузке модели или label_encoder: {e}")
+        raise
 
     feature_extractor = Model(inputs=model.input, outputs=model.layers[-2].output)
 
@@ -38,25 +64,40 @@ def full_predict(image_path, model_path, label_encoder_path):
     features_similar_image = None
 
     if main_category == '公司':
-        kmeans_model_path = 'Cluster_Dataset/clustered_images_company/kmeans_model.pkl'
+        logging.debug("Предсказан класс '公司'")
+        kmeans_model_path = resource_path('Cluster_Dataset/clustered_images_company/kmeans_model.pkl')
         data_folder = 'Dataset/公司'
     elif main_category == '關防-整理好的':
-        kmeans_model_path = 'Cluster_Dataset/clustered_images_government/kmeans_model.pkl'
+        logging.debug("Предсказан класс '關防-整理好的'")
+        kmeans_model_path = resource_path('Cluster_Dataset/clustered_images_government/kmeans_model.pkl')
         data_folder = 'Dataset/關防-整理好的'
     else:
+        logging.error(f"Неизвестная категория: {main_category}")
         raise ValueError(f"未知類別: {main_category}")
 
-    if not os.path.exists(kmeans_model_path):
+    # Загружаем модель KMeans
+    try:
+        kmeans_model = joblib.load(kmeans_model_path)
+    except Exception as e:
+        logging.exception(f"Ошибка при загрузке KMeans модели: {e}")
         raise FileNotFoundError(f"未在路徑中找到 KMeans 模型: {kmeans_model_path}")
 
-    kmeans = joblib.load(kmeans_model_path)
-
-    cluster_id = kmeans.predict(features_original)[0]
+    # Предсказание кластера
+    cluster_id = kmeans_model.predict(features_original)[0]
     cluster_name = int(cluster_id)
 
+    # Используем resource_path для data_folder
+    data_folder = resource_path(data_folder)
 
-    features_database = np.load(os.path.join(data_folder, 'features_database.npy'))
-    filenames_database = joblib.load(os.path.join(data_folder, 'filenames_database.pkl'))
+    # Загружаем базу данных признаков
+    try:
+        features_database_path = os.path.join(data_folder, 'features_database.npy')
+        filenames_database_path = os.path.join(data_folder, 'filenames_database.pkl')
+        features_database = np.load(features_database_path)
+        filenames_database = joblib.load(filenames_database_path)
+    except Exception as e:
+        logging.exception(f"Ошибка при загрузке базы данных признаков: {e}")
+        raise
 
     from sklearn.metrics.pairwise import cosine_similarity
     similarities = cosine_similarity(features_original, features_database)[0]
@@ -68,6 +109,9 @@ def full_predict(image_path, model_path, label_encoder_path):
         similarity = max_similarity
         most_similar_image_path = filenames_database[max_similarity_idx]
         features_similar = features_database[max_similarity_idx]
+
+        # Используем resource_path для пути к изображению
+        most_similar_image_path = resource_path(most_similar_image_path)
 
         similar_pil_image = Image.open(most_similar_image_path).convert('L').resize(img_size)
         features_similar_image = get_visual_features(similar_pil_image)
@@ -92,10 +136,11 @@ def full_predict(image_path, model_path, label_encoder_path):
 
 def get_visual_features(pil_image):
     edge_image = pil_image.filter(ImageFilter.FIND_EDGES)
-
     byte_arr = io.BytesIO()
     edge_image.save(byte_arr, format='PNG')
     qimage = QImage()
-    qimage.loadFromData(byte_arr.getvalue())
-
+    success = qimage.loadFromData(byte_arr.getvalue())
+    if not success:
+        logging.error("Не удалось загрузить QImage из данных")
+        return None
     return qimage
