@@ -54,11 +54,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.flask_process = None
 
     def select_category(self):
-        # Открываем диалоговое окно с выбором категории
         options = ["公司", "關防-整理好的"]
         item, okPressed = QtWidgets.QInputDialog.getItem(self, "選擇來源", "選擇來源:", options, 0, False)
         if okPressed and item:
-            # Пользователь выбрал категорию
             self.display_category_info(item)
 
     def display_category_info(self, category_name):
@@ -66,7 +64,6 @@ class MainWindow(QtWidgets.QMainWindow):
         import joblib
         from collections import Counter
 
-        # Определяем путь к выбранной категории и модели KMeans
         if category_name == "公司":
             data_folder = resource_path('Dataset/公司')
             kmeans_model_path = resource_path('Cluster_Dataset/clustered_images_company/kmeans_model.pkl')
@@ -77,14 +74,12 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.warning(self, "錯誤", "未知的來源")
             return
 
-        # Загружаем KMeans модель
         try:
             kmeans_model = joblib.load(kmeans_model_path)
         except Exception as e:
             QtWidgets.QMessageBox.critical(self, "錯誤", f"無法加載 KMeans 模型:\n{e}")
             return
 
-        # Загружаем признаки изображений и имена файлов из выбранной директории
         try:
             features_database = np.load(os.path.join(data_folder, 'features_database.npy'))
             filenames_database = joblib.load(os.path.join(data_folder, 'filenames_database.pkl'))
@@ -92,25 +87,19 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.critical(self, "錯誤", f"無法加載特徵數據庫:\n{e}")
             return
 
-        # Получаем предсказания кластеров
         cluster_labels = kmeans_model.predict(features_database)
 
-        # Подсчитываем количество изображений в каждом кластере
         cluster_counts = Counter(cluster_labels)
 
-        # Предполагаем, что кластеры 0, 1, 2 соответствуют категориям A, B, C
-        # Если соответствие другое, измените номера кластеров ниже
         count_A = cluster_counts.get(0, 0)
         count_B = cluster_counts.get(1, 0)
         count_C = cluster_counts.get(2, 0)
 
-        # Формируем строку с информацией
         info_text = f"來源: {category_name}\n"
         info_text += f"A 類別的照片數量: {count_A}\n"
         info_text += f"B 類別的照片數量: {count_B}\n"
         info_text += f"C 類別的照片數量: {count_C}"
 
-        # Отображаем информацию в метке analyz_3
         self.ui.analyz_3.setText(info_text)
 
     def initUI(self):
@@ -279,38 +268,29 @@ class MainWindow(QtWidgets.QMainWindow):
         image_path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, "選擇圖像", "", "Images (*.png *.jpg *.jpeg);;All Files (*)", options=options)
         if image_path:
-            # Обновляем прогресс-бар до 0%
             self.ui.progressBar.setValue(0)
 
-            # Отображаем оригинальное изображение
             pixmap = QtGui.QPixmap(image_path)
             self.ui.input_image.setPixmap(pixmap.scaled(self.ui.input_image.size(), QtCore.Qt.KeepAspectRatio))
             self.ui.input_image.setAlignment(QtCore.Qt.AlignCenter)
 
-            # Обновляем прогресс-бар до 50%
             self.ui.progressBar.setValue(50)
             QtWidgets.QApplication.processEvents()
 
-            # Используем resource_path для путей
             model_path = resource_path(self.model_path)
             label_encoder_path = resource_path(self.label_encoder_path)
 
-            # Выполняем предсказание и отображаем результаты
             self.process_image(image_path, model_path, label_encoder_path)
 
-            # Обновляем прогресс-бар до 100%
             self.ui.progressBar.setValue(100)
 
     def process_image(self, image_path, model_path, label_encoder_path):
         try:
-            logging.debug("Начинается обработка изображения")
             results = our_model.full_predict(
                 image_path,
                 model_path,
                 label_encoder_path
             )
-            logging.debug("Обработка изображения завершена успешно")
-
             main_category = results['main_category']
             sub_categories = results['sub_categories']
             cluster_name = results['cluster_name']
@@ -364,8 +344,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
         except Exception as e:
-
-            logging.exception("Произошло исключение в process_image")
 
             QtWidgets.QMessageBox.critical(
 
