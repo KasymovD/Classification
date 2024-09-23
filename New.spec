@@ -26,9 +26,14 @@ datas = [
     ('our_model.py', '.'),  # Добавляем our_model.py
     ('model.h5', '.'),  # Модель для CNN
     ('label_encoder.pkl', '.'),  # Label Encoder файл
+    ('training_history.pkl','.'),
     # Добавляем иконки
     ('icons', 'icons'),
     ('Cluster_Dataset/clustered_images_government/kmeans_model.pkl', 'Cluster_Dataset/clustered_images_government'),
+    ('Dataset/公司/features_database.npy', '.'),
+    ('Dataset/公司/filenames_database.pkl', '.'),
+    ('Dataset/關防-整理好的/features_database.npy', '.'),
+    ('Dataset/關防-整理好的/filenames_database.pkl', '.'),
 ]
 
 # Добавляем файлы из Cluster_Dataset и Dataset
@@ -65,12 +70,13 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='StampClassifier',
+    name='郵票分類器IPAI',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,  # Если хотите скрыть консоль
+    console=False,  # Если хотите скрыть консоль
+    icon='favicon.ico',
 )
 
 coll = COLLECT(

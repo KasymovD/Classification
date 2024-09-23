@@ -20,6 +20,7 @@ from collections import Counter
 logging.basicConfig(filename='app.log', level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(message)s')
 
 def resource_path(relative_path):
+    """Получает абсолютный путь к ресурсу, работает для dev и для PyInstaller"""
     try:
         base_path = sys._MEIPASS
     except Exception:
@@ -33,7 +34,6 @@ class MainWindow(QtWidgets.QMainWindow):
         super(MainWindow, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
-        self.initUI()
 
         self.model_path = None
         self.label_encoder_path = None
@@ -102,8 +102,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.ui.analyz_3.setText(info_text)
 
-    def initUI(self):
-        self.setFixedSize(1920, 1350)
 
     def history_of_train_choose(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "選擇歷史文件", "", "Pickle Files (*.pkl)")
