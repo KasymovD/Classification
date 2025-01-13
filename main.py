@@ -1,380 +1,439 @@
-import logging
-import pickle
-import time
-import numpy as np
-from PyQt5.QtWidgets import QFileDialog, QMessageBox, QApplication, QMainWindow
 import sys
-from PyQt5 import QtWidgets, QtGui, QtCore
-from main_ui import Ui_MainWindow
-import our_model
+from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog, QLabel, QMessageBox
+from PySide6.QtGui import QPixmap, QImage
+from PySide6.QtCore import Qt
+from ui_main import Ui_MainWindow
 import os
-import io
-import subprocess
-from PIL import Image, ImageEnhance
-from hachoir.parser import createParser
-from hachoir.metadata import extractMetadata
-import sys
+from PIL import Image
+import numpy as np
+import cv2
+from pathlib import Path
+from PySide6.QtWidgets import QApplication, QMainWindow, QScrollArea, QWidget, QMessageBox, QInputDialog
+import pickle
 from utils import resource_path_1
-from collections import Counter
 
-logging.basicConfig(filename='app.log', level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(message)s')
-
-def resource_path(relative_path):
+def load_image(image_path):
     try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
+        with Image.open(image_path) as img:
+            img = img.convert('L')
+            img_array = np.array(img)
+        return img_array
+    except Exception as e:
+        print(f"{image_path}: {e}")
+        return None
 
-    return os.path.join(base_path, relative_path)
+def binarize_image(image_array, threshold=127):
+    binarized = np.where(image_array > threshold, 255, 0).astype(np.uint8)
+    return binarized
 
+def calculate_similarity(image1_array, image2_array):
+    if image1_array.shape != image2_array.shape:
+        image2_array = cv2.resize(image2_array, (image1_array.shape[1], image1_array.shape[0]))
+    total_pixels = image1_array.size
+    matching_pixels = np.sum(image1_array == image2_array)
+    similarity_percentage = (matching_pixels / total_pixels) * 100
+    return similarity_percentage
 
-class MainWindow(QtWidgets.QMainWindow):
+class MainWindow(QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+        self.showMaximized()
+        scroll_area = QScrollArea(self)
+        scroll_area.setWidgetResizable(True)
 
-        self.model_path = None
-        self.label_encoder_path = None
-        self.gan_model_path = None
-        self.generated_images_dir = None
-        self.input_image_path = None
+        container_widget = QWidget()
+        self.ui = Ui_MainWindow()
+        self.ui.setupUi(self)
+        scroll_area.setWidget(self.centralWidget())
+        self.setCentralWidget(scroll_area)
+        self.ui.Start_button.clicked.connect(self.start_comparison)
+        self.ui.Start_button_2.clicked.connect(self.clear_all)
+        self.black_white_folder = 'black_white'
+        self.original_folder = 'original'
+        self.database_images = self.load_database_images()
+        self.file_category_mapping = self.load_mapping('file_category_mapping.pkl')
 
-        self.ui.Model_choose_button.clicked.connect(self.choose_model)
-        self.ui.Save_button.clicked.connect(self.choose_label_encoder)
-        self.ui.Start_button.clicked.connect(self.start_process)
-        self.ui.Clear_button.clicked.connect(self.clear_labels)
-        self.ui.Generator_button.clicked.connect(self.start_generation)
-        self.ui.Crop_button.clicked.connect(self.select_category)
-        self.ui.Test_button.clicked.connect(self.open_image_dialog)
-        self.ui.Learn_button.clicked.connect(self.history_of_train_choose)
+        self.ui.input_image.setFixedSize(256, 256)
+        # Повторите для всех QLabel, где отображаются изображения
+        self.ui.input_image_2.setFixedSize(256, 256)
+        self.ui.original_image.setFixedSize(256, 256)
+        self.ui.original_image_2.setFixedSize(256, 256)
+        self.ui.top1.setFixedSize(356, 256)
+        self.ui.top1_black_white.setFixedSize(356, 256)
+        self.ui.top2.setFixedSize(356, 256)
+        self.ui.top2_black_white.setFixedSize(356, 256)
+        self.ui.top3.setFixedSize(356, 256)
+        self.ui.top3_black_white.setFixedSize(356, 256)
 
-        self.ui.progressBar.setValue(0)
-        self.flask_process = None
 
-    def select_category(self):
-        options = ["公司", "關防-整理好的"]
-        item, okPressed = QtWidgets.QInputDialog.getItem(self, "選擇來源", "選擇來源:", options, 0, False)
-        if okPressed and item:
-            self.display_category_info(item)
 
-    def display_category_info(self, category_name):
-        import numpy as np
-        import joblib
-        from collections import Counter
-
-        if category_name == "公司":
-            data_folder = resource_path('Dataset/公司')
-            kmeans_model_path = resource_path('Cluster_Dataset/clustered_images_company/kmeans_model.pkl')
-        elif category_name == "關防-整理好的":
-            data_folder = resource_path('Dataset/關防-整理好的')
-            kmeans_model_path = resource_path('Cluster_Dataset/clustered_images_government/kmeans_model.pkl')
-        else:
-            QtWidgets.QMessageBox.warning(self, "錯誤", "未知的來源")
-            return
-
+    def load_mapping(self, filename='file_category_mapping.pkl'):
         try:
-            kmeans_model = joblib.load(kmeans_model_path)
-        except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "錯誤", f"無法加載 KMeans 模型:\n{e}")
-            return
+            with open(filename, 'rb') as f:
+                mapping = pickle.load(f)
+            return mapping
+        except FileNotFoundError:
+            QMessageBox.warning(self, "錯誤", f"{filename}")
+            return {}
 
+
+    def load_database_images(self, size=(256, 256)):
+        images = []
+        folder = Path(self.black_white_folder)
+        for image_file in folder.rglob('*'):
+            if image_file.is_file() and image_file.suffix.lower() in ['.png', '.jpg', '.jpeg', '.bmp', '.tiff']:
+                try:
+                    img = self.load_image_with_pil(str(image_file), grayscale=True)
+                    if img is not None:
+                        img_resized = cv2.resize(img, size, interpolation=cv2.INTER_AREA)
+                        relative_path = image_file.relative_to(self.black_white_folder)
+                        category = relative_path.parent
+                        images.append((str(image_file), image_file.name, category, img_resized))
+                except Exception as e:
+                    print(f" {image_file}: {e}")
+        return images
+
+    def load_image_with_pil(self, image_path, grayscale=True):
         try:
-            features_database = np.load(os.path.join(data_folder, 'features_database.npy'))
-            filenames_database = joblib.load(os.path.join(data_folder, 'filenames_database.pkl'))
+            with Image.open(image_path) as img_pil:
+                if grayscale:
+                    img_pil = img_pil.convert('L')
+                    img = np.array(img_pil)
+                else:
+                    img_pil = img_pil.convert('RGB')
+                    img = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
+                return img
         except Exception as e:
-            QtWidgets.QMessageBox.critical(self, "錯誤", f"無法加載特徵數據庫:\n{e}")
-            return
-
-        cluster_labels = kmeans_model.predict(features_database)
-
-        cluster_counts = Counter(cluster_labels)
-
-        count_A = cluster_counts.get(0, 0)
-        count_B = cluster_counts.get(1, 0)
-        count_C = cluster_counts.get(2, 0)
-
-        info_text = f"來源: {category_name}\n"
-        info_text += f"A 類別的照片數量: {count_A}\n"
-        info_text += f"B 類別的照片數量: {count_B}\n"
-        info_text += f"C 類別的照片數量: {count_C}"
-
-        self.ui.analyz_3.setText(info_text)
-
-
-    def history_of_train_choose(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "選擇歷史文件", "", "Pickle Files (*.pkl)")
-
-        if file_path:
-            try:
-                with open(file_path, 'rb') as f:
-                    self.history = pickle.load(f)
-                self.history_of_train()
-            except Exception as e:
-                QMessageBox.critical(self, "錯誤", f"文件加載錯誤: {str(e)}")
-        else:
-            QMessageBox.information(self, "取消", "未選擇文件")
-
-    def history_of_train(self):
-        self.ui.progressBar.setValue(0)
-        top1_accuracy = self.history.get('accuracy')
-        top5_accuracy = self.history.get('top_5_accuracy')
-        self.ui.analyz.setText("印章類別")
-        self.ui.analyz_2.setText("相似度百分比")
-        self.ui.progressBar.setValue(50)
-
-        if top1_accuracy:
-            max_top1 = "{:.2f}".format(max(top1_accuracy))
-            self.ui.analyz_3.setText(f"Top-1 Accuracy: {max_top1}%")
-            self.ui.progressBar.setValue(100)
-
-        else:
-            self.ui.analyz_3.setText("未找到 Top-1 準確率")
-            self.ui.progressBar.setValue(100)
-
-
-        if top5_accuracy:
-            max_top5 = "{:.4f}".format(max(top5_accuracy))
-            current_text = self.ui.analyz_3.text()
-            self.ui.analyz_3.setText(f"{current_text}\nTop-5 Accuracy: {max_top5}%")
-            self.ui.progressBar.setValue(100)
-
-        else:
-            current_text = self.ui.analyz_3.text()
-            self.ui.analyz_3.setText(f"{current_text}\n未找到 Top-5 準確率")
-            self.ui.progressBar.setValue(100)
-
-    def open_image_dialog(self):
-        options = QFileDialog.Options()
-        file_name, _ = QFileDialog.getOpenFileName(self, "選擇圖像", "",
-                                                   "Images (*.png *.jpg *.jpeg *.bmp)", options=options)
-
-        if file_name:
-            self.extract_and_display_all_metadata(file_name)
-
-    def extract_and_display_all_metadata(self, image_path):
-        try:
-            parser = createParser(image_path)
-            if not parser:
-                self.ui.analyz_3.setText("無法為文件創建解析器.")
-                return
-
-            metadata = extractMetadata(parser)
-
-            if not metadata:
-                self.ui.analyz_3.setText("未找到元數據.")
-                return
-
-            metadata_str = ""
-            for line in metadata.exportPlaintext():
-                metadata_str += line + "\n"
-
-            self.ui.analyz_3.setText(metadata_str)
-
-        except Exception as e:
-            self.ui.analyz_3.setText(f"提取數據時發生錯誤: {str(e)}")
-
-
-
-    def start_generation(self):
-        self.ui.progressBar.setValue(0)
-        file_dialog = QFileDialog()
-        img_paths, _ = file_dialog.getOpenFileNames(self, '選擇圖片', '',
-                                                    'Images (*.png *.jpg *.jpeg *.bmp)')
-
-        if img_paths:
-            output_folder = QFileDialog.getExistingDirectory(self,
-                                                             '選擇保存圖片的文件夾')
-
-            if output_folder:
-                for img_path in img_paths:
-                    self.augment_image_and_save(img_path, output_folder)
-
-                self.ui.analyz.setText(
-                    f'圖片的第 \n{len(img_paths)} 次增強已完成。\n已保存到 {output_folder}.')
-
-    def augment_image_and_save(self, img_path, output_folder, augment_count=30):
-        image = self.load_image(img_path)
-        self.ui.progressBar.setValue(50)
-
-        if image:
-            base_filename = os.path.splitext(os.path.basename(img_path))[0]
-
-            for i in range(augment_count):
-                augmented_image = self.augment_image(image)
-                augmented_filename = f"{base_filename}_fake_{i + 1}.png"
-                augmented_image.save(os.path.join(output_folder, augmented_filename))
-
-            print(
-                f"圖片增強 {img_path} 已完成並保存到 {output_folder}")
-            self.ui.progressBar.setValue(100)
-
-        else:
-            print(f"無法載入圖片 {img_path}")
-
-    def load_image(self, image_path):
-        try:
-            image = Image.open(image_path)
-            image = image.resize((128, 128))
-            return image
-        except Exception as e:
-            print(f"載入圖片時出錯 {image_path}: {e}")
-            self.ui.progressBar.setValue(100)
             return None
 
-    def augment_image(self, image):
-        enhancer = ImageEnhance.Brightness(image)
-        image = enhancer.enhance(np.random.uniform(0.7, 1.1))
+    def compute_image_hash(self, image):
+        import imagehash
+        from PIL import Image
 
-        enhancer = ImageEnhance.Contrast(image)
-        image = enhancer.enhance(np.random.uniform(0.7, 1.1))
+        pil_image = Image.fromarray(image)
+        return imagehash.phash(pil_image)
 
-        image_array = np.array(image)
-        noise = np.random.normal(0, 0.5, image_array.shape).astype(np.uint8)
-        image = Image.fromarray(np.clip(image_array + noise, 0, 255).astype(np.uint8))
-
-        image = image.rotate(np.random.uniform(0, 360))
-
-        return image
-
-    def choose_model(self):
-        options = QtWidgets.QFileDialog.Options()
-        fileName, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "選擇 CNN 模型", "", "H5 Files (*.h5);;All Files (*)", options=options)
-        if fileName:
-            self.model_path = fileName
-            QtWidgets.QMessageBox.information(
-                self, "模型已選擇", f"您已選擇模型: {os.path.basename(fileName)}")
-
-    def choose_label_encoder(self):
-        options = QtWidgets.QFileDialog.Options()
-        fileName, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "選擇類別文件", "", "Pickle Files (*.pkl);;All Files (*)", options=options)
-        if fileName:
-            self.label_encoder_path = fileName
-            QtWidgets.QMessageBox.information(
-                self, "類別文件已選擇", f"您已選擇類別文件: {os.path.basename(fileName)}")
-
-    def start_process(self):
-        if not self.model_path or not self.label_encoder_path:
-            QtWidgets.QMessageBox.warning(
-                self, "錯誤", "請在開始前選擇模型和類別文件。")
-            return
-
-        options = QtWidgets.QFileDialog.Options()
-        image_path, _ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "選擇圖像", "", "Images (*.png *.jpg *.jpeg);;All Files (*)", options=options)
-        if image_path:
-            self.ui.progressBar.setValue(0)
-
-            pixmap = QtGui.QPixmap(image_path)
-            self.ui.input_image.setPixmap(pixmap.scaled(self.ui.input_image.size(), QtCore.Qt.KeepAspectRatio))
-            self.ui.input_image.setAlignment(QtCore.Qt.AlignCenter)
-
-            self.ui.progressBar.setValue(50)
-            QtWidgets.QApplication.processEvents()
-
-            model_path = resource_path(self.model_path)
-            label_encoder_path = resource_path(self.label_encoder_path)
-
-            self.process_image(image_path, model_path, label_encoder_path)
-
-            self.ui.progressBar.setValue(100)
-
-    def process_image(self, image_path, model_path, label_encoder_path):
-        try:
-            results = our_model.full_predict(
-                image_path,
-                model_path,
-                label_encoder_path
+    def start_comparison(self):
+        options = QFileDialog.Options()
+        file_name, _ = QFileDialog.getOpenFileName(
+            self,
+            "選擇印章圖像",
+            "",
+            "Images (*.png *.jpg *.bmp)",
+            options=options
+        )
+        if file_name:
+            # Загружаем и масштабируем изображение
+            pixmap = QPixmap(file_name).scaled(
+                self.ui.input_image.size(),
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation
             )
-            main_category = results['main_category']
-            sub_categories = results['sub_categories']
-            cluster_name = results['cluster_name']
-            similarity = results['similarity']
-            most_similar_image = results['most_similar_image']
-            features_original = results['features_original']
-            features_similar = results['features_similar']
-            features_image = results['features_image']
-            features_similar_image = results['features_similar_image']
+            self.ui.input_image.setPixmap(pixmap)
 
-            sub_categories_str = ' -> '.join(sub_categories) if sub_categories else '無'
-            if int(cluster_name) == 0:
-                self.ui.analyz.setText(f"類別: {main_category}\n子類別: {sub_categories_str}\n集群/來源: A")
-                self.ui.analyz_2.setText(f"相似度: {similarity:.2f}%")
-            elif int(cluster_name) == 1:
-                self.ui.analyz.setText(f"類別: {main_category}\n子類別: {sub_categories_str}\n集群/來源: B")
-                self.ui.analyz_2.setText(f"相似度: {similarity:.2f}%")
-            elif int(cluster_name) == 2:
-                self.ui.analyz.setText(f"類別: {main_category}\n子類別: {sub_categories_str}\n集群/來源: C")
-                self.ui.analyz_2.setText(f"相似度: {similarity:.2f}%")
-            if similarity >= 85:
-                self.ui.analyz_3.setText("找到相似的圖像✅")
+            file_basename = os.path.basename(file_name).lower().strip()
+            print(f"'{file_basename}'")
+            categories = self.file_category_mapping.get(file_basename)
+            if not categories:
+                QMessageBox.information(self, "提示", f"未找到名稱為 {file_basename} 的相應分類，請手動選擇分類。")
+                available_categories = self.get_available_categories()
+                if not available_categories:
+                    QMessageBox.warning(self, "錯誤", "未找到可用的類別")
+                    return
+                category, ok = QInputDialog.getItem(
+                    self,
+                    "選擇類別",
+                    "請選擇類別：",
+                    available_categories,
+                    0,
+                    False
+                )
+                if not ok:
+                    QMessageBox.warning(self, "錯誤", "未選擇類別")
+                    return
+                categories = [category]
             else:
-                self.ui.analyz_3.setText("未找到相似的圖像❌")
-                self.ui.analyz.setText(f"類別: {0}\n子類別: {0}\n集群/來源: 0")
-                self.ui.analyz_2.setText(f"相似度: {similarity:.2f}%")
+                categories = list(categories)
 
-            features_pixmap = QtGui.QPixmap.fromImage(features_image)
-            self.ui.image2.setPixmap(
-                features_pixmap.scaled(self.ui.image2.size(), QtCore.Qt.KeepAspectRatio))
-            self.ui.image2.setAlignment(QtCore.Qt.AlignCenter)
-
-            if similarity >= 85 and most_similar_image:
-                pixmap_similar = QtGui.QPixmap(most_similar_image)
-                self.ui.model_image.setPixmap(
-                    pixmap_similar.scaled(self.ui.model_image.size(), QtCore.Qt.KeepAspectRatio))
-                self.ui.model_image.setAlignment(QtCore.Qt.AlignCenter)
-
-                features_similar_pixmap = QtGui.QPixmap.fromImage(
-                    features_similar_image)
-                self.ui.label.setPixmap(
-                    features_similar_pixmap.scaled(self.ui.label.size(), QtCore.Qt.KeepAspectRatio))
-                self.ui.label.setAlignment(QtCore.Qt.AlignCenter)
+            if len(categories) > 1:
+                category, ok = QInputDialog.getItem(
+                    self,
+                    "選擇類別",
+                    f"文件 {file_basename}",
+                    categories,
+                    0,
+                    False
+                )
+                if not ok:
+                    QMessageBox.warning(self, "錯誤", "未選擇類別")
+                    return
             else:
-                self.ui.model_image.clear()
-                self.ui.model_image.setText(
-                    "與原始印章最相似的照片")
+                category = categories[0]
+            black_white_image_path = self.find_black_white_image(file_basename, category)
+            if not black_white_image_path:
+                QMessageBox.warning(self, "錯誤", f"未找到名稱為 {file_basename} 的相應黑白圖像 в категории {category}")
+                return
+            test_image = self.load_image_with_pil(black_white_image_path, grayscale=True)
+            if test_image is None:
+                return
 
-                self.ui.label.clear()
-                self.ui.label.setText("原始印章的特徵")
+            test_image = cv2.resize(test_image, (256, 256), interpolation=cv2.INTER_AREA)
+            self.display_image_in_label(test_image, self.ui.input_image_2)
+            selected_image_hash = self.compute_image_hash(test_image)
+
+            category_images = []
+            for img in self.database_images:
+                image_path, name, cat, image = img
+                if str(cat) == category:
+                    current_image_hash = self.compute_image_hash(image)
+                    if selected_image_hash != current_image_hash:
+                        category_images.append(img)
+
+            if len(category_images) < 2:
+                self.ui.analyz.setText("該類別包含的圖像數量不足以進行比較❌")
+                self.ui.original_image.setText("🚫")
+                self.ui.original_image_2.setText("🚫")
+                self.ui.top1.setText("🚫")
+                self.ui.top1_black_white.setText("🚫")
+                self.ui.top2.setText("🚫")
+                self.ui.top2_black_white.setText("🚫")
+                self.ui.top3.setText("🚫")
+                self.ui.top3_black_white.setText("🚫")
+                self.ui.analyz_2.setText("分析結論\n字體差異: 同字體 (不同字體)\n字樣差異: 同字樣 (不同字樣_\n字距差異: 字距相同(字距不同)\n行距差異性: 行距相同(行距不同)\n")
+                return
+            else:
+                self.ui.analyz.setText("")
+                self.ui.top1.clear()
+                self.ui.top1_black_white.clear()
+                self.ui.top2.clear()
+                self.ui.top2_black_white.clear()
+                self.ui.top3.clear()
+                self.ui.top3_black_white.clear()
+
+            similarities = []
+            for image_path, name, cat, image in category_images:
+                test_image_bin = binarize_image(test_image)
+                image_bin = binarize_image(image)
+                similarity = calculate_similarity(test_image_bin, image_bin)
+
+                similarities.append((similarity, image_path, name, image))
+            similarities.sort(reverse=True, key=lambda x: x[0])
+            top_similarities = similarities[:3]
+
+            for idx, (similarity, image_path, name, image) in enumerate(top_similarities):
+                original_image_path = self.get_original_image_path(image_path)
+                if original_image_path and os.path.exists(original_image_path):
+                    original_pixmap = QPixmap(original_image_path)
+                    original_pixmap_resized = original_pixmap.scaled(256, 256, Qt.KeepAspectRatio)
+                else:
+                    original_pixmap_resized = QPixmap(256, 256)
+                    original_pixmap_resized.fill(Qt.gray)
+
+                highlighted_image = self.highlight_differences(image, test_image)
+                highlighted_image_resized = cv2.resize(highlighted_image, (256, 256), interpolation=cv2.INTER_AREA)
+
+                if idx == 0:
+                    self.ui.original_image.setPixmap(original_pixmap_resized)
+                    self.display_image_in_label(highlighted_image_resized, self.ui.original_image_2)
+                    self.ui.top1.setPixmap(original_pixmap_resized)
+                    self.display_image_in_label(highlighted_image_resized, self.ui.top1_black_white)
+                elif idx == 1:
+                    # Top 2
+                    self.ui.top2.setPixmap(original_pixmap_resized)
+                    self.display_image_in_label(highlighted_image_resized, self.ui.top2_black_white)
+                elif idx == 2:
+                    # Top 3
+                    self.ui.top3.setPixmap(original_pixmap_resized)
+                    self.display_image_in_label(highlighted_image_resized, self.ui.top3_black_white)
+
+            category_name = category.replace(os.sep, ' -> ')
+            analysis_text = f"類別名稱: {category_name}\n\n"
+            for idx, (similarity, image_path, name, image) in enumerate(top_similarities):
+                similarity_percent = round(similarity, 2)
+                analysis_text += f"Top {idx + 1}: {name} 相似度: {similarity_percent}%\n"
+            self.ui.analyz.setText(analysis_text)
+
+            font_difference = self.get_font_difference(test_image, top_similarities[0][3])
+            spacing_difference = self.get_spacing_difference(test_image, top_similarities[0][3])
+
+            different_pixels, total_pixels, difference_metric = self.calculate_difference_metrics(test_image,
+                                                                                                  top_similarities[0][
+                                                                                                      3])
+
+            analysis_text_2 = (
+                f"分析結論\n"
+                f"字體差異: {font_difference}\n"
+                f"字樣差異: {font_difference}\n"
+                f"字距差異: {spacing_difference}\n"
+                f"行距差異性: {spacing_difference}\n"
+                # f"總像素數: {total_pixels}\n"
+                # f"相同像素數: {int(total_pixels - different_pixels)}\n"
+                # f"不同像素數: {different_pixels}\n"
+                # f"差異百分比: {round(difference_metric, 2)}%\n"
+                f"相似度得分: {round(top_similarities[0][0], 2)}%\n"
+            )
+            self.ui.analyz_2.setText(analysis_text_2)
 
 
+    def get_category_from_path(self, file_path):
+        try:
+            relative_path = os.path.relpath(file_path, self.original_folder)
+            category = os.path.dirname(relative_path)
+            return category
         except Exception as e:
+            return None
 
-            QtWidgets.QMessageBox.critical(
+    def find_black_white_image(self, file_basename, category=None):
+        if category:
+            potential_path = os.path.join(self.black_white_folder, category, file_basename)
+            if os.path.exists(potential_path):
+                return potential_path
+        return None
 
-                self, "錯誤", f"處理圖像時發生錯誤:\n{e}")
+    def get_corresponding_black_white_image_path(self, original_image_path):
+        relative_path = os.path.relpath(original_image_path, self.original_folder)
+        black_white_image_path = os.path.join(self.black_white_folder, relative_path)
+        return black_white_image_path
 
-    def clear_labels(self):
-        self.ui.input_image.clear()
-        self.ui.input_image.setText("原始印章")
+    def get_original_image_path(self, black_white_image_path):
+        relative_path = os.path.relpath(black_white_image_path, self.black_white_folder)
 
-        self.ui.image2.clear()
-        self.ui.image2.setText("原始印章的特徵")
+        original_image_path = os.path.join(self.original_folder, relative_path)
+        if not os.path.exists(original_image_path):
+            print(f"{original_image_path}")
+            return None
+        return original_image_path
 
-        self.ui.model_image.clear()
-        self.ui.model_image.setText(
-            "與原始印章最相似的照片")
+    def display_image_in_label(self, image, label):
+        if len(image.shape) == 2:
+            height, width = image.shape
+            bytes_per_line = width
+            q_image = QImage(image.data, width, height, bytes_per_line, QImage.Format_Grayscale8)
+        else:
+            height, width, channel = image.shape
+            bytes_per_line = 3 * width
+            q_image = QImage(image.data, width, height, bytes_per_line, QImage.Format_RGB888)
+        pixmap = QPixmap.fromImage(q_image).scaled(label.size(), Qt.KeepAspectRatio)
+        label.setPixmap(pixmap)
 
-        self.ui.label.clear()
-        self.ui.label.setText("原始印章的特徵")
+    def calculate_similarity(self, img1, img2):
+        if img1.shape != img2.shape:
+            img2 = cv2.resize(img2, (img1.shape[1], img1.shape[0]))
+        match_pixels = np.count_nonzero(img1 == img2)
+        total_pixels = img1.size
+        similarity = match_pixels / total_pixels
+        return similarity
 
-        self.ui.analyz.setText("印章類別")
-        self.ui.analyz_2.setText("相似度百分比")
-        self.ui.analyz_3.setText("分析結論")
+    def highlight_differences(self, img1, img2):
+        if img1.shape != img2.shape:
+            img2 = cv2.resize(img2, (img1.shape[1], img1.shape[0]))
 
-        self.ui.progressBar.setValue(0)
+        _, img1_thresh = cv2.threshold(img1, 127, 255, cv2.THRESH_BINARY)
+        _, img2_thresh = cv2.threshold(img2, 127, 255, cv2.THRESH_BINARY)
 
-        self.model_path = None
-        self.label_encoder_path = None
-        self.gan_model_path = None
-        self.generated_images_dir = None
-        self.input_image_path = None
+        contours, _ = cv2.findContours(img1_thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if contours:
+            max_contour = max(contours, key=cv2.contourArea)
+            border_mask = np.zeros_like(img1_thresh)
+            cv2.drawContours(border_mask, [max_contour], -1, 255, thickness=cv2.FILLED)
+            inner_mask = cv2.bitwise_not(border_mask)
+        else:
+            inner_mask = np.ones_like(img1_thresh) * 255
+            border_mask = np.zeros_like(img1_thresh)
+
+        border_diff = cv2.bitwise_and(cv2.absdiff(img1_thresh, img2_thresh), border_mask)
+        inner_diff = cv2.bitwise_and(cv2.absdiff(img1_thresh, img2_thresh), inner_mask)
+        img_color = cv2.cvtColor(img1, cv2.COLOR_GRAY2BGR)
+        img_color[border_diff > 50] = [0, 0, 255]  # BGR: красный
+        img_color[inner_diff > 50] = [0, 255, 0]  # BGR: зеленый
+
+        return img_color
+
+    def calculate_difference_metrics(self, img1, img2):
+        if img1.shape != img2.shape:
+            img2 = cv2.resize(img2, (img1.shape[1], img1.shape[0]))
+        diff = cv2.absdiff(img1, img2)
+        different_pixels = np.count_nonzero(diff)
+        total_pixels = diff.size
+        difference_metric = (different_pixels / total_pixels) * 100
+        return different_pixels, total_pixels, difference_metric
+
+    def get_font_difference(self, img1, img2):
+        if img1.shape != img2.shape:
+            img2 = cv2.resize(img2, (img1.shape[1], img1.shape[0]))
+
+        _, img1_thresh = cv2.threshold(img1, 127, 255, cv2.THRESH_BINARY)
+        _, img2_thresh = cv2.threshold(img2, 127, 255, cv2.THRESH_BINARY)
+
+        contours1, _ = cv2.findContours(img1_thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours2, _ = cv2.findContours(img2_thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        moments1 = cv2.moments(img1_thresh)
+        huMoments1 = cv2.HuMoments(moments1).flatten()
+        moments2 = cv2.moments(img2_thresh)
+        huMoments2 = cv2.HuMoments(moments2).flatten()
+        difference = np.sum(np.abs(huMoments1 - huMoments2))
+        difference = np.log10(difference + 1)
+        if difference < 0.5:
+            return "字體相同"
+        elif difference < 1.0:
+            return "字體相似"
+        else:
+            return "字體不同"
+
+    def get_spacing_difference(self, img1, img2):
+        projection1 = np.sum(img1 == 0, axis=0)
+        projection2 = np.sum(img2 == 0, axis=0)
+        projection1 = projection1 / np.max(projection1)
+        projection2 = projection2 / np.max(projection2)
+
+        diff = np.abs(projection1 - projection2)
+        mse = np.mean(diff**2)
+
+        if mse < 0.01:
+            return "字距相同"
+        elif mse < 0.05:
+            return "字距相似"
+        else:
+            return "字距不同"
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            reply = QMessageBox(self)
+            reply.setWindowTitle("確認退出")
+            reply.setText("您確定要關閉應用程式嗎？")
+            reply.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+
+            yes_button = reply.button(QMessageBox.Yes)
+            yes_button.setText("是")
+            no_button = reply.button(QMessageBox.No)
+            no_button.setText("否")
+
+            reply.exec()
+
+            if reply.clickedButton() == yes_button:
+                self.close()
+
+    def clear_all(self):
+        self.ui.input_image.setText("欲辨識印章")
+        self.ui.input_image_2.setText("欲辨識印章特徵")
+        self.ui.original_image.setText("最相似印章")
+        self.ui.original_image_2.setText("最相似印章特徵")
+        self.ui.top1.clear()
+        self.ui.top1_black_white.clear()
+        self.ui.top2.clear()
+        self.ui.top2_black_white.clear()
+        self.ui.top3.clear()
+        self.ui.top3_black_white.clear()
+
+        self.ui.analyz.setText("類別名稱")
+        self.ui.analyz_2.setText("分析結論\n字體差異: 同字體 (不同字體)\n字樣差異: 同字樣 (不同字樣_\n字距差異: 字距相同(字距不同)\n行距差異性: 行距相同(行距不同)\n")
 
 
 if __name__ == "__main__":
-    app = QtWidgets.QApplication(sys.argv)
-    application = MainWindow()
-    application.show()
-    sys.exit(app.exec_())
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())
