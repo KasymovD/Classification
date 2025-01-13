@@ -20,7 +20,6 @@ from collections import Counter
 logging.basicConfig(filename='app.log', level=logging.DEBUG, format='%(asctime)s %(levelname)s:%(message)s')
 
 def resource_path(relative_path):
-    """Получает абсолютный путь к ресурсу, работает для dev и для PyInstaller"""
     try:
         base_path = sys._MEIPASS
     except Exception:
