@@ -56,7 +56,6 @@ class MainWindow(QMainWindow):
         self.file_category_mapping = self.load_mapping('file_category_mapping.pkl')
 
         self.ui.input_image.setFixedSize(256, 256)
-        # Повторите для всех QLabel, где отображаются изображения
         self.ui.input_image_2.setFixedSize(256, 256)
         self.ui.original_image.setFixedSize(256, 256)
         self.ui.original_image_2.setFixedSize(256, 256)
@@ -240,11 +239,9 @@ class MainWindow(QMainWindow):
                     self.ui.top1.setPixmap(original_pixmap_resized)
                     self.display_image_in_label(highlighted_image_resized, self.ui.top1_black_white)
                 elif idx == 1:
-                    # Top 2
                     self.ui.top2.setPixmap(original_pixmap_resized)
                     self.display_image_in_label(highlighted_image_resized, self.ui.top2_black_white)
                 elif idx == 2:
-                    # Top 3
                     self.ui.top3.setPixmap(original_pixmap_resized)
                     self.display_image_in_label(highlighted_image_resized, self.ui.top3_black_white)
 
