@@ -1,6 +1,5 @@
 
-![Logo](lib/logo.png)
-
+![Logo](lib/logo3.png)
 
 # Image Similarity and Analysis Tool
 
