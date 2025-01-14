@@ -1,5 +1,5 @@
 
-![Logo](lib/logo.png)
+![Logo](lib/seal_scan_aoi.png)
 
 
 # Image Similarity and Analysis Tool
