@@ -36,7 +36,7 @@ This project provides a desktop GUI application built with PySide6 that performs
         - Difference percentage
     - Font and Spacing Comparison: Additional analysis includes using Hu Moments to estimate font differences and projection-based metrics (mean squared error) to assess differences in spacing.
 
-![App Screenshot](logo)
+![App Screenshot](lib/Seal%20Scan%20AOI%20Diagram.png)
 
 
 
@@ -73,7 +73,7 @@ Start the GUI project
 ```
 ## Demo
 
-![Image](logo/demo.gif)
+![Image](lib/demo.gif)
 
 
 ## License
